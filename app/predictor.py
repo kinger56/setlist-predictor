@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 
 from app.setlistfm import Show
 
-DEFAULT_HALF_LIFE = 8.0
+DEFAULT_HALF_LIFE = 2.0
 
 # Category thresholds, by probability.
 LOCK = "lock"  # played at nearly every show
