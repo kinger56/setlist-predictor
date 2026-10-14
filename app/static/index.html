@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Setlist Predictor</title>
+  <style>
+    :root {
+      --bg: #f6f3ee;
+      --card: #ffffff;
+      --ink: #1c1a17;
+      --muted: #6d675e;
+      --line: #e4ded4;
+      --accent: #d4472b;
+      --lock: #1f7a4d;
+      --likely: #2f6fb3;
+      --rotating: #b57a12;
+      --rare: #8a8378;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #14130f; --card: #1e1c18; --ink: #f1ece4; --muted: #a39b8f;
+        --line: #333029; --accent: #ff6a4a; --lock: #4cc287; --likely: #6aa8ec;
+        --rotating: #e3a93b; --rare: #8f877b;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 680px; margin: 0 auto; padding: 40px 16px 64px; }
+    h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+    h1 span { color: var(--accent); }
+    .sub { color: var(--muted); margin: 0 0 28px; }
+    form { display: flex; gap: 8px; }
+    input {
+      flex: 1; min-width: 0; padding: 12px 14px; font: inherit; color: var(--ink);
+      background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    }
+    button {
+      padding: 12px 18px; font: inherit; font-weight: 600; cursor: pointer;
+      color: #fff; background: var(--accent); border: 0; border-radius: 10px;
+    }
+    button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 20px; margin-top: 20px;
+    }
+    .artists button {
+      display: block; width: 100%; text-align: left; margin: 0 0 8px;
+      background: var(--bg); color: var(--ink); border: 1px solid var(--line); font-weight: 500;
+    }
+    .artists small { color: var(--muted); font-weight: 400; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin: 4px 0 16px; }
+    ol { margin: 0; padding: 0; list-style: none; counter-reset: song; }
+    li {
+      display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px;
+      padding: 9px 0; border-bottom: 1px solid var(--line); counter-increment: song;
+    }
+    li::before { content: counter(song); color: var(--muted); font-variant-numeric: tabular-nums; }
+    li.unnumbered::before { content: "·"; }
+    li.encore-label { counter-increment: none; }
+    li.encore-label::before { content: none; }
+    .encore-label {
+      display: block; padding: 14px 0 6px; font-size: 0.8rem; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);
+      border-bottom: 1px solid var(--line);
+    }
+    .song small { color: var(--muted); }
+    .badge {
+      font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 99px;
+      border: 1px solid currentColor; white-space: nowrap;
+    }
+    .lock { color: var(--lock); } .likely { color: var(--likely); }
+    .rotating { color: var(--rotating); } .rare { color: var(--rare); }
+    h2 { font-size: 1.25rem; margin: 0; }
+    h3 { font-size: 1rem; margin: 24px 0 8px; }
+    .error { color: var(--accent); }
+    .stats { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 12px; }
+    .stat b { display: block; font-size: 1.6rem; }
+    .stat span { color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Setlist <span>Predictor</span></h1>
+  <p class="sub">What will they play at your show? Predictions from the band's recent setlists.</p>
+
+  <form id="search-form">
+    <input id="query" placeholder="Search an artist, e.g. Paramore" autocomplete="off" required>
+    <button id="search-btn">Search</button>
+  </form>
+
+  <div id="results"></div>
+</main>
+
+<script>
+  // All text from the API is inserted with textContent, never innerHTML.
+  // Song names come from user-edited data, so innerHTML could let someone
+  // inject a <script> into the page (an XSS attack).
+
+  const results = document.getElementById("results");
+
+  function el(tag, props = {}, children = []) {
+    const node = document.createElement(tag);
+    Object.assign(node, props);
+    for (const child of children) node.append(child);
+    return node;
+  }
+
+  async function getJson(url) {
+    const response = await fetch(url);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.detail || `Request failed (${response.status})`);
+    return body;
+  }
+
+  function showMessage(text, isError = false) {
+    results.replaceChildren(el("div", { className: "card" + (isError ? " error" : ""), textContent: text }));
+  }
+
+  document.getElementById("search-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const query = document.getElementById("query").value.trim();
+    if (!query) return;
+    showMessage("Searching…");
+    try {
+      const artists = await getJson(`/api/artists?q=${encodeURIComponent(query)}`);
+      if (artists.length === 0) return showMessage("No artists found. Try another spelling.");
+      const buttons = artists.map((a) =>
+        el("button", { onclick: () => loadPrediction(a) }, [
+          a.name + " ",
+          el("small", { textContent: a.disambiguation || "" }),
+        ])
+      );
+      results.replaceChildren(el("div", { className: "card artists" }, [
+        el("p", { className: "meta", textContent: "Which one?" }), ...buttons,
+      ]));
+    } catch (err) {
+      showMessage(err.message, true);
+    }
+  });
+
+  function songRow(song, numbered = true) {
+    const pct = Math.round(song.probability * 100);
+    const detail = song.is_cover ? " (cover)" : "";
+    return el("li", { className: numbered ? "" : "unnumbered" }, [
+      el("span", { className: "song" }, [song.name, el("small", { textContent: detail })]),
+      el("span", { className: `badge ${song.category}`, textContent: `${song.category} · ${pct}%` }),
+    ]);
+  }
+
+  async function loadPrediction(artist) {
+    showMessage(`Reading ${artist.name}'s recent setlists…`);
+    try {
+      const data = await getJson(`/api/predict?mbid=${artist.mbid}`);
+      const list = el("ol");
+      let encoreStarted = false;
+      for (const song of data.setlist) {
+        if (song.encore_rate >= 0.5 && !encoreStarted) {
+          list.append(el("li", { className: "encore-label", textContent: "Encore" }));
+          encoreStarted = true;
+        }
+        list.append(songRow(song));
+      }
+
+      const latest = data.latest_show;
+      const card = el("div", { className: "card" }, [
+        el("h2", { textContent: `${artist.name}: predicted setlist` }),
+        el("p", { className: "meta", textContent:
+          `Based on ${data.shows_used} shows (${data.date_range.from} to ${data.date_range.to}). ` +
+          `Last show: ${latest.venue}, ${latest.city}.` }),
+        list,
+      ]);
+
+      if (data.also_possible.length) {
+        const extra = el("ol");
+        data.also_possible.forEach((s) => extra.append(songRow(s, false)));
+        card.append(el("h3", { textContent: "Also possible" }), extra);
+      }
+
+      const accuracy = el("div");
+      const btn = el("button", { className: "secondary", textContent: "How accurate is this?" });
+      btn.onclick = () => loadBacktest(artist, btn, accuracy);
+      card.append(el("h3", { textContent: "Accuracy" }), btn, accuracy);
+
+      results.replaceChildren(card);
+    } catch (err) {
+      showMessage(err.message, true);
+    }
+  }
+
+  async function loadBacktest(artist, btn, target) {
+    btn.disabled = true;
+    btn.textContent = "Testing against past shows…";
+    try {
+      const r = await getJson(`/api/backtest?mbid=${artist.mbid}`);
+      const stat = (value, label) =>
+        el("div", { className: "stat" }, [el("b", { textContent: `${Math.round(value * 100)}%` }), el("span", { textContent: label })]);
+      target.replaceChildren(
+        el("p", { className: "meta", textContent:
+          `Tested on ${r.shows_tested} past shows, each predicted only from the shows before it.` }),
+        el("div", { className: "stats" }, [
+          stat(r.precision, "of predicted songs were played"),
+          stat(r.recall, "of played songs were predicted"),
+          stat(r.baseline_precision, "precision without recency weighting"),
+        ])
+      );
+      btn.remove();
+    } catch (err) {
+      target.replaceChildren(el("p", { className: "error", textContent: err.message }));
+      btn.disabled = false;
+      btn.textContent = "Try again";
+    }
+  }
+</script>
+</body>
+</html>
