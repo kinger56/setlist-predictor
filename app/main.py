@@ -82,7 +82,7 @@ def _song_json(song: SongStats) -> dict:
 # --------------------------------------------------------------------------
 
 
-@app.get("/", include_in_schema=False)
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
