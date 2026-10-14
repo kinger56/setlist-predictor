@@ -1,0 +1,51 @@
+{
+  "type": "setlists",
+  "itemsPerPage": 20,
+  "page": 1,
+  "total": 3,
+  "setlist": [
+    {
+      "id": "3b9a1c2d",
+      "eventDate": "18-09-2026",
+      "artist": {"mbid": "11111111-2222-3333-4444-555555555555", "name": "The Example Band"},
+      "venue": {"name": "The Fillmore", "city": {"name": "San Francisco"}},
+      "tour": {"name": "Fake Tour 2026"},
+      "sets": {
+        "set": [
+          {
+            "song": [
+              {"name": "Walk-On Music", "tape": true},
+              {"name": "Opener Song"},
+              {"name": "Hit Single"},
+              {"name": "Old Favorite", "cover": {"name": "Some Other Artist"}},
+              {"name": ""}
+            ]
+          },
+          {
+            "encore": 1,
+            "song": [{"name": "Big Closer"}]
+          }
+        ]
+      }
+    },
+    {
+      "id": "4c0b2d3e",
+      "eventDate": "25-12-2026",
+      "artist": {"mbid": "11111111-2222-3333-4444-555555555555", "name": "The Example Band"},
+      "venue": {"name": "Future Arena", "city": {"name": "Oakland"}},
+      "sets": {"set": []}
+    },
+    {
+      "id": "5d1c3e4f",
+      "eventDate": "16-09-2026",
+      "artist": {"mbid": "11111111-2222-3333-4444-555555555555", "name": "The Example Band"},
+      "venue": {"name": "Roseland", "city": {"name": "Portland"}},
+      "sets": {
+        "set": [
+          {"song": [{"name": "Opener Song"}, {"name": "Deep Cut"}, {"name": "Hit Single"}]},
+          {"encore": 1, "song": [{"name": "Big Closer"}]}
+        ]
+      }
+    }
+  ]
+}
