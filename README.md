@@ -15,7 +15,8 @@ Search for an artist and see what they'll probably play at your show: each song'
 
 ## Why I built it
 
-<!-- Make this yours: add a sentence about the concert or moment that gave you the idea. -->
+I love coding and being able to create whatever I want, so when I had a question about music, I built the tool to answer it.
+
 Before a concert, fans scroll through setlist.fm to guess what they'll hear. But 20 past setlists don't tell you at a glance which songs are near-certain, which rotate night to night, and which are a long shot. I wanted a tool that turns that history into probabilities, and that is honest about how often those probabilities turn out to be right.
 
 ## Features
