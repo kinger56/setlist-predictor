@@ -151,6 +151,41 @@ def test_prediction_picks_most_likely_songs():
     assert {"Always1", "Always2", "Sometimes"} == set(names)
 
 
+def test_expected_length_favors_recent_shows():
+    # Newest show has 10 songs, the one before it 2. With half_life=1 the
+    # weights are 1 and 0.5, so the length is (10*1 + 2*0.5) / 1.5 = 7.33 -> 7.
+    shows = [
+        make_show([f"S{i}" for i in range(10)], days_ago=0),
+        make_show(["S0", "S1"], days_ago=1),
+    ]
+    assert expected_length(shows, half_life=1) == 7
+
+
+def test_single_show_predicts_that_exact_show():
+    show = make_show(["Intro", "Hit", "Ballad"], encore=["Finale"])
+    assert [s.name for s in predict([show]).setlist] == ["Intro", "Hit", "Ballad", "Finale"]
+
+
+def test_song_in_encore_half_the_time_is_placed_in_encore():
+    # encore_rate == 0.5 is the cutoff; ties go to the encore section.
+    shows = [
+        make_show(["A", "B"], encore=["Sometimes Encore"], days_ago=0),
+        # Opening this show gives it an early average position, so if it were
+        # put in the main set it would land in the middle, not at the end.
+        make_show(["Sometimes Encore", "A", "B"], days_ago=1),
+    ]
+    setlist = predict(shows, half_life=None).setlist
+    assert [s.name for s in setlist] == ["A", "B", "Sometimes Encore"]
+
+
+def test_rare_songs_are_left_out_when_set_is_full():
+    # Two songs every night, plus one different one-off song each night.
+    shows = [make_show(["Staple1", "Staple2", f"OneOff{d}"], days_ago=d) for d in range(6)]
+    names = {s.name for s in predict(shows, half_life=None).setlist}
+    assert {"Staple1", "Staple2"} <= names
+    assert len(names) == 3  # only one slot left for a one-off
+
+
 def test_predict_requires_shows():
     with pytest.raises(ValueError):
         predict([])

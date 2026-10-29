@@ -86,6 +86,12 @@ def test_backtest_reports_both_scores(api):
     assert body["shows_tested"] == 5
 
 
+def test_backtest_404_when_too_few_shows(api):
+    body = api(FakeSetlistClient(regular_shows(3))).get("/api/backtest", params={"mbid": MBID})
+    assert body.status_code == 404
+    assert "Need at least" in body.json()["detail"]
+
+
 def test_missing_api_key_gives_clear_error(monkeypatch):
     monkeypatch.delenv("SETLISTFM_API_KEY", raising=False)
     response = TestClient(app).get("/api/artists", params={"q": "example"})
