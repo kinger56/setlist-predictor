@@ -58,6 +58,8 @@ def test_predict_returns_setlist_in_order(api):
     assert [s["name"] for s in body["setlist"]] == ["Opener", "Hit", "Closer", "Encore"]
     assert body["setlist"][0]["category"] == "lock"
     assert body["shows_used"] == 10
+    assert body["setlist"][0]["last_played"] == "2026-10-01"
+    assert body["setlist"][0]["shows_since"] == 0
 
 
 def test_predict_rejects_malformed_mbid(api):

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import date
 
 from app.setlistfm import Show
 
@@ -45,6 +46,8 @@ class SongStats:
     encore_rate: float  # share of plays that were in the encore
     is_cover: bool
     category: str
+    last_played: date  # date of the newest show that included this song
+    shows_since: int  # how many newer shows skipped it (0 = played at the latest show)
 
 
 @dataclass(frozen=True)
@@ -98,13 +101,15 @@ def song_stats(
     # Everything below is keyed by song_key(name). `display_names` remembers
     # the newest spelling of each song to show to users.
     display_names: dict[str, str] = {}
+    # Shows are newest first, so the first time we see a song is its latest play.
+    last_seen: dict[str, tuple[date, int]] = {}
     weighted_plays: dict[str, float] = defaultdict(float)
     play_counts: dict[str, int] = defaultdict(int)
     positions: dict[str, list[float]] = defaultdict(list)
     encore_plays: dict[str, int] = defaultdict(int)
     covers: set[str] = set()
 
-    for show, weight in zip(newest_first, weights):
+    for show_index, (show, weight) in enumerate(zip(newest_first, weights)):
         last_index = len(show.songs) - 1
         seen_tonight: set[str] = set()
         for song in show.songs:
@@ -115,6 +120,7 @@ def song_stats(
                 continue
             seen_tonight.add(key)
             display_names.setdefault(key, song.name)  # shows are newest first
+            last_seen.setdefault(key, (show.date, show_index))
 
             weighted_plays[key] += weight
             play_counts[key] += 1
@@ -140,6 +146,8 @@ def song_stats(
                 encore_rate=encore_plays[key] / count,
                 is_cover=key in covers,
                 category=categorize(probability),
+                last_played=last_seen[key][0],
+                shows_since=last_seen[key][1],
             )
         )
 

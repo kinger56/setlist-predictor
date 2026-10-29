@@ -74,6 +74,8 @@ def _song_json(song: SongStats) -> dict:
         "category": song.category,
         "encore_rate": round(song.encore_rate, 2),
         "is_cover": song.is_cover,
+        "last_played": song.last_played.isoformat(),
+        "shows_since": song.shows_since,
     }
 
 

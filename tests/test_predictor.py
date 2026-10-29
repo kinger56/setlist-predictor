@@ -103,6 +103,20 @@ def test_encore_rate():
     assert stats_by_name(shows)["Closer"].encore_rate == 0.5
 
 
+def test_last_played_and_shows_since():
+    shows = [
+        make_show(["Every Night"], days_ago=0),
+        make_show(["Every Night"], days_ago=1),
+        make_show(["Every Night", "Deep Cut"], days_ago=2),
+    ]
+    stats = stats_by_name(shows)
+    assert stats["Every Night"].shows_since == 0
+    assert stats["Every Night"].last_played == shows[0].date
+    # Skipped at the 2 newest shows, last played 2 days back.
+    assert stats["Deep Cut"].shows_since == 2
+    assert stats["Deep Cut"].last_played == shows[2].date
+
+
 def test_no_shows_means_no_stats():
     assert song_stats([]) == []
 
