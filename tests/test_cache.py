@@ -38,3 +38,29 @@ def test_setting_again_overwrites():
     cache.set("key", "old")
     cache.set("key", "new")
     assert cache.get("key") == "new"
+
+
+def test_prune_removes_only_expired_entries():
+    clock = FakeClock()
+    cache = Cache(ttl_seconds=60, clock=clock)
+    cache.set("old", "value")
+    clock.now += 30
+    cache.set("fresh", "value")
+
+    clock.now += 40  # "old" is now 70s old, "fresh" is 40s old
+    assert cache.prune() == 1
+    assert cache.get("fresh") == "value"
+    assert cache.prune() == 0
+
+
+def test_expired_entries_are_pruned_on_startup(tmp_path):
+    path = str(tmp_path / "cache.db")
+    clock = FakeClock()
+    Cache(path, ttl_seconds=60, clock=clock).set("old", "value")
+
+    clock.now += 61
+    Cache(path, ttl_seconds=60, clock=clock)  # e.g. the server restarting
+
+    import sqlite3
+    rows = sqlite3.connect(path).execute("SELECT COUNT(*) FROM api_cache").fetchone()
+    assert rows == (0,)

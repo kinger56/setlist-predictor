@@ -42,6 +42,19 @@ class Cache:
                    )"""
             )
             self._conn.commit()
+        # Expired rows are never read again, so clear them out at startup to
+        # stop the database file from growing forever.
+        self.prune()
+
+    def prune(self) -> int:
+        """Delete expired entries. Returns how many were removed."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM api_cache WHERE fetched_at < ?",
+                (self._clock() - self._ttl,),
+            )
+            self._conn.commit()
+        return cursor.rowcount
 
     def get(self, key: str) -> str | None:
         with self._lock:
