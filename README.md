@@ -7,7 +7,7 @@ Predicts what a band will play at your concert, based on their recent setlists f
 ## How it works
 
 1. Fetches the artist's most recent setlists from the setlist.fm API (cached in SQLite, rate-limited, with retries).
-2. Scores every song by how often it was played, giving recent shows more weight (each show's weight halves every 8 shows back).
+2. Scores every song by how often it was played, giving recent shows more weight (each show's weight halves every 2 shows back; 2 scored best in backtesting).
 3. Picks the expected number of songs and orders them by where they usually appear, with encore songs last.
 4. **Backtesting:** predicts each past show using only the shows before it, then compares with what was actually played.
 
