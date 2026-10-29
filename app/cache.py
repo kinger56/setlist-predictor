@@ -46,6 +46,19 @@ class Cache:
         # stop the database file from growing forever.
         self.prune()
 
+    def close(self) -> None:
+        """Close the database connection. The web app keeps one cache open
+        for its whole life, but scripts and tests should close theirs."""
+        with self._lock:
+            self._conn.close()
+
+    # Lets callers write `with Cache(path) as cache:` to close it automatically.
+    def __enter__(self) -> "Cache":
+        return self
+
+    def __exit__(self, *exc_info) -> None:
+        self.close()
+
     def prune(self) -> int:
         """Delete expired entries. Returns how many were removed."""
         with self._lock:

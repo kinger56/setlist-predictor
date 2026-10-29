@@ -9,7 +9,6 @@ import json
 import httpx
 import pytest
 
-from app.cache import Cache
 from app.setlistfm import SetlistFmClient, SetlistFmError
 from tests.helpers import load_fixture
 
@@ -102,8 +101,8 @@ def test_does_not_retry_bad_api_key():
     assert len(http.requests) == 1
 
 
-def test_cached_responses_skip_the_network():
-    cache = Cache()
+def test_cached_responses_skip_the_network(make_cache):
+    cache = make_cache()
     client, http, _ = make_client([FakeResponse(200, ARTIST_SEARCH)], cache=cache)
     client.search_artists("example")
     client.search_artists("example")
