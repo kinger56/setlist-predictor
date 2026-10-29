@@ -108,11 +108,18 @@ def parse_setlist(raw: dict) -> Show | None:
     if not songs:
         return None
 
+    # setlist.fm dates look like "31-12-2025" (day-month-year). Setlists are
+    # user-edited, so skip one with a missing or malformed date rather than
+    # crashing the whole request over it.
+    try:
+        show_date = datetime.strptime(raw.get("eventDate") or "", "%d-%m-%Y").date()
+    except ValueError:
+        return None
+
     venue = raw.get("venue") or {}
     return Show(
         id=raw.get("id", ""),
-        # setlist.fm dates look like "31-12-2025" (day-month-year)
-        date=datetime.strptime(raw["eventDate"], "%d-%m-%Y").date(),
+        date=show_date,
         venue=venue.get("name", ""),
         city=(venue.get("city") or {}).get("name", ""),
         tour=(raw.get("tour") or {}).get("name"),

@@ -41,3 +41,13 @@ def test_show_without_songs_is_skipped():
 
 def test_missing_tour_is_none():
     assert parse_setlist(RAW[2]).tour is None
+
+
+def test_show_with_missing_or_bad_date_is_skipped():
+    for bad_date in (None, "", "2026-09-18", "31-02-2026"):
+        raw = dict(RAW[0])
+        if bad_date is None:
+            raw.pop("eventDate")
+        else:
+            raw["eventDate"] = bad_date
+        assert parse_setlist(raw) is None, bad_date
