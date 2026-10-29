@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.predictor import DEFAULT_HALF_LIFE, predict
+from app.predictor import DEFAULT_HALF_LIFE, predict, song_key
 from app.setlistfm import Show
 
 
@@ -54,8 +54,10 @@ def backtest(
         target = oldest_first[i]
 
         prediction = predict(history, half_life)
-        predicted_names = {song.name for song in prediction.setlist}
-        p, r = score(predicted_names, target.song_names)
+        # Compare normalized titles so "Misery business" matches "Misery Business".
+        predicted = {song_key(song.name) for song in prediction.setlist}
+        actual = {song_key(name) for name in target.song_names}
+        p, r = score(predicted, actual)
         precisions.append(p)
         recalls.append(r)
 

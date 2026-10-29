@@ -64,6 +64,16 @@ def recency_weights(count: int, half_life: float | None) -> list[float]:
     return [0.5 ** (i / half_life) for i in range(count)]
 
 
+def song_key(name: str) -> str:
+    """Normalize a song title so spelling variants count as one song.
+
+    setlist.fm is edited by fans, so the same song shows up as "Misery
+    Business", "Misery business" or "Don’t" vs "Don't". We compare titles
+    ignoring case, curly quotes and extra spaces.
+    """
+    return " ".join(name.replace("’", "'").casefold().split())
+
+
 def categorize(probability: float) -> str:
     if probability >= 0.8:
         return LOCK
@@ -85,6 +95,9 @@ def song_stats(
     weights = recency_weights(len(newest_first), half_life)
     total_weight = sum(weights)
 
+    # Everything below is keyed by song_key(name). `display_names` remembers
+    # the newest spelling of each song to show to users.
+    display_names: dict[str, str] = {}
     weighted_plays: dict[str, float] = defaultdict(float)
     play_counts: dict[str, int] = defaultdict(int)
     positions: dict[str, list[float]] = defaultdict(list)
@@ -97,33 +110,35 @@ def song_stats(
         for song in show.songs:
             # Some bands reprise a song twice in one night. Count it once per
             # show, or its probability could go above 100%.
-            if song.name in seen_tonight:
+            key = song_key(song.name)
+            if key in seen_tonight:
                 continue
-            seen_tonight.add(song.name)
+            seen_tonight.add(key)
+            display_names.setdefault(key, song.name)  # shows are newest first
 
-            weighted_plays[song.name] += weight
-            play_counts[song.name] += 1
+            weighted_plays[key] += weight
+            play_counts[key] += 1
             # Relative position, so a 12-song show and a 25-song show compare fairly.
-            positions[song.name].append(
+            positions[key].append(
                 song.position / last_index if last_index > 0 else 0.0
             )
             if song.is_encore:
-                encore_plays[song.name] += 1
+                encore_plays[key] += 1
             if song.is_cover:
-                covers.add(song.name)
+                covers.add(key)
 
     stats = []
-    for name, played_weight in weighted_plays.items():
+    for key, played_weight in weighted_plays.items():
         probability = played_weight / total_weight
-        count = play_counts[name]
+        count = play_counts[key]
         stats.append(
             SongStats(
-                name=name,
+                name=display_names[key],
                 probability=probability,
                 times_played=count,
-                avg_position=sum(positions[name]) / count,
-                encore_rate=encore_plays[name] / count,
-                is_cover=name in covers,
+                avg_position=sum(positions[key]) / count,
+                encore_rate=encore_plays[key] / count,
+                is_cover=key in covers,
                 category=categorize(probability),
             )
         )
@@ -137,7 +152,10 @@ def expected_length(shows: list[Show], half_life: float | None = DEFAULT_HALF_LI
     """Weighted average number of distinct songs per show, rounded."""
     newest_first = sorted(shows, key=lambda s: s.date, reverse=True)
     weights = recency_weights(len(newest_first), half_life)
-    weighted_total = sum(len(show.song_names) * w for show, w in zip(newest_first, weights))
+    weighted_total = sum(
+        len({song_key(name) for name in show.song_names}) * w
+        for show, w in zip(newest_first, weights)
+    )
     return max(1, round(weighted_total / sum(weights)))
 
 

@@ -140,3 +140,27 @@ def test_prediction_picks_most_likely_songs():
 def test_predict_requires_shows():
     with pytest.raises(ValueError):
         predict([])
+
+
+# ---- spelling variants -----------------------------------------------------
+
+
+def test_spelling_variants_count_as_one_song():
+    shows = [
+        make_show(["Misery Business", "Don’t Stop"], days_ago=0),
+        make_show(["misery  business", "Don't Stop"], days_ago=1),
+    ]
+    stats = stats_by_name(shows, half_life=None)
+    # One entry per song, shown with the newest show's spelling, played at both shows.
+    assert set(stats) == {"Misery Business", "Don’t Stop"}
+    assert stats["Misery Business"].probability == 1.0
+    assert stats["Misery Business"].times_played == 2
+
+
+def test_backtest_matches_spelling_variants():
+    from app.backtest import backtest
+
+    history = [make_show(["Hit Song"], days_ago=d) for d in range(1, 6)]
+    target = make_show(["hit song"], days_ago=0)
+    result = backtest(history + [target], min_history=5)
+    assert result.precision == 1.0
