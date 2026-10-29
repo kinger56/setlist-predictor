@@ -56,7 +56,7 @@
     .meta { color: var(--muted); font-size: 0.9rem; margin: 4px 0 16px; }
     ol { margin: 0; padding: 0; list-style: none; counter-reset: song; }
     li {
-      display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px;
+      display: grid; grid-template-columns: 28px 1fr 4.5rem; align-items: center; gap: 10px;
       padding: 9px 0; border-bottom: 1px solid var(--line); counter-increment: song;
     }
     li::before { content: counter(song); color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -69,9 +69,26 @@
       border-bottom: 1px solid var(--line);
     }
     .song small { color: var(--muted); }
-    .badge {
-      font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 99px;
-      border: 1px solid currentColor; white-space: nowrap;
+    /* Probability bar: a grey track with a filled part as wide as the chance. */
+    .bar {
+      display: block; height: 6px; margin-top: 6px; border-radius: 99px;
+      background: var(--line); overflow: hidden;
+    }
+    .bar span {
+      display: block; height: 100%; border-radius: inherit; background: currentColor;
+      transform-origin: left; animation: grow 0.6s ease-out;
+    }
+    @keyframes grow { from { transform: scaleX(0); } }
+    @media (prefers-reduced-motion: reduce) { .bar span { animation: none; } }
+    .pct { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .pct small {
+      display: block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.8rem; margin: -6px 0 12px; }
+    .legend span::before {
+      content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 5px;
+      border-radius: 50%; background: currentColor;
     }
     .lock { color: var(--lock); } .likely { color: var(--likely); }
     .rotating { color: var(--rotating); } .rare { color: var(--rare); }
@@ -146,9 +163,24 @@
   function songRow(song, numbered = true) {
     const pct = Math.round(song.probability * 100);
     const detail = song.is_cover ? " (cover)" : "";
+    // The bar is decorative: the percentage next to it carries the same
+    // information for screen readers.
+    const bar = el("span", { className: `bar ${song.category}` }, [el("span")]);
+    bar.setAttribute("aria-hidden", "true");
+    bar.firstChild.style.width = `${pct}%`;
     return el("li", { className: numbered ? "" : "unnumbered" }, [
-      el("span", { className: "song" }, [song.name, el("small", { textContent: detail })]),
-      el("span", { className: `badge ${song.category}`, textContent: `${song.category} · ${pct}%` }),
+      el("div", { className: "song" }, [song.name, el("small", { textContent: detail }), bar]),
+      el("div", { className: `pct ${song.category}` }, [
+        `${pct}%`, el("small", { textContent: song.category }),
+      ]),
+    ]);
+  }
+
+  function legend() {
+    const item = (category, text) => el("span", { className: category, textContent: text });
+    return el("p", { className: "legend" }, [
+      item("lock", "Lock 80%+"), item("likely", "Likely 40%+"),
+      item("rotating", "Rotating 15%+"), item("rare", "Rare"),
     ]);
   }
 
@@ -172,6 +204,7 @@
         el("p", { className: "meta", textContent:
           `Based on ${data.shows_used} shows (${data.date_range.from} to ${data.date_range.to}). ` +
           `Last show: ${latest.venue}, ${latest.city}.` }),
+        legend(),
         list,
       ]);
 
