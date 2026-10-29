@@ -22,7 +22,7 @@ git clone https://github.com/<your-username>/setlist-predictor.git
 cd setlist-predictor
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env             # then put your setlist.fm API key in .env
 uvicorn app.main:app --reload
 ```

@@ -1,5 +1,6 @@
-fastapi>=0.115
-uvicorn[standard]>=0.30
-httpx>=0.27
-python-dotenv>=1.0
-pytest>=8.0
+# What the app needs to run. Exact versions so every install (your laptop,
+# CI, the host) gets the same code. Update them deliberately, then rerun tests.
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+httpx==0.28.1
+python-dotenv==1.2.4
