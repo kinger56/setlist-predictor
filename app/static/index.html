@@ -69,6 +69,11 @@
       border-bottom: 1px solid var(--line);
     }
     .song small { color: var(--muted); }
+    .song .when { display: block; font-size: 0.8rem; margin-top: 4px; }
+    .notice {
+      font-size: 0.9rem; padding: 10px 12px; margin: 0 0 16px; border-radius: 10px;
+      background: var(--bg); border-left: 3px solid var(--rotating);
+    }
     /* Probability bar: a grey track with a filled part as wide as the chance. */
     .bar {
       display: block; height: 6px; margin-top: 6px; border-radius: 99px;
@@ -138,11 +143,21 @@
     results.replaceChildren(el("div", { className: "card" + (isError ? " error" : ""), textContent: text }));
   }
 
+  // "2024-09-20" -> "Sep 20, 2024". The "T00:00" keeps it in local time;
+  // without it the browser reads UTC midnight and can show the day before.
+  function formatDate(iso) {
+    return new Date(`${iso}T00:00`).toLocaleDateString(undefined,
+      { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  const searchBtn = document.getElementById("search-btn");
+
   document.getElementById("search-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const query = document.getElementById("query").value.trim();
     if (!query) return;
     showMessage("Searching…");
+    searchBtn.disabled = true;  // stop double-submits while we wait
     try {
       const artists = await getJson(`/api/artists?q=${encodeURIComponent(query)}`);
       if (artists.length === 0) return showMessage("No artists found. Try another spelling.");
@@ -157,6 +172,8 @@
       ]));
     } catch (err) {
       showMessage(err.message, true);
+    } finally {
+      searchBtn.disabled = false;
     }
   });
 
@@ -168,8 +185,15 @@
     const bar = el("span", { className: `bar ${song.category}` }, [el("span")]);
     bar.setAttribute("aria-hidden", "true");
     bar.firstChild.style.width = `${pct}%`;
+    const parts = [song.name, el("small", { textContent: detail }), bar];
+    // Only worth mentioning when the band has skipped it lately.
+    if (song.shows_since > 0) {
+      const skipped = song.shows_since === 1 ? "the last show" : `the last ${song.shows_since} shows`;
+      parts.push(el("small", { className: "when",
+        textContent: `Last played ${formatDate(song.last_played)} · skipped ${skipped}` }));
+    }
     return el("li", { className: numbered ? "" : "unnumbered" }, [
-      el("div", { className: "song" }, [song.name, el("small", { textContent: detail }), bar]),
+      el("div", { className: "song" }, parts),
       el("div", { className: `pct ${song.category}` }, [
         `${pct}%`, el("small", { textContent: song.category }),
       ]),
@@ -202,11 +226,21 @@
       const card = el("div", { className: "card" }, [
         el("h2", { textContent: `${artist.name}: predicted setlist` }),
         el("p", { className: "meta", textContent:
-          `Based on ${data.shows_used} shows (${data.date_range.from} to ${data.date_range.to}). ` +
-          `Last show: ${latest.venue}, ${latest.city}.` }),
-        legend(),
-        list,
+          `Based on ${data.shows_used} shows from ${formatDate(data.date_range.from)} ` +
+          `to ${formatDate(data.date_range.to)}. Last show: ${latest.venue}, ${latest.city}.` }),
       ]);
+
+      // If the newest setlist is old, the band may be between tours and the
+      // next tour could look different. Say so instead of looking confident.
+      const daysSinceLatest = (Date.now() - new Date(`${latest.date}T00:00`)) / 86_400_000;
+      if (daysSinceLatest > 180) {
+        const month = new Date(`${latest.date}T00:00`).toLocaleDateString(undefined,
+          { month: "long", year: "numeric" });
+        card.append(el("p", { className: "notice", textContent:
+          `${artist.name}'s most recent setlist is from ${month}, so this reflects ` +
+          `their last tour. A new tour may look different.` }));
+      }
+      card.append(legend(), list);
 
       if (data.also_possible.length) {
         const extra = el("ol");
