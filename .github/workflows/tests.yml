@@ -13,4 +13,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
-      - run: pytest -v
+      # Fails the build if tests cover less than 90% of the app code.
+      - run: pytest -v --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=90

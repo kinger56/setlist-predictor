@@ -40,6 +40,7 @@ python -m scripts.tune "Paramore" "Phish" "Bleachers"  # accuracy for different 
 
 ```bash
 pytest -v
+pytest --cov=app --cov-report=term-missing   # with a coverage report
 ```
 
 Tests never touch the network: the API client is tested against a fake HTTP client, and the web routes against a fake setlist.fm client.

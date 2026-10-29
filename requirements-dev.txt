@@ -1,3 +1,5 @@
 # Extra tools for development and CI only; the deployed app doesn't need these.
 -r requirements.txt
 pytest==9.1.1
+pytest-cov==7.1.0     # test coverage report
+hypothesis==6.170.13  # property-based tests (tests/test_predictor_properties.py)
