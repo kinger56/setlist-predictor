@@ -12,6 +12,7 @@ API docs: https://api.setlist.fm/docs/1.0/index.html
 from __future__ import annotations
 
 import json
+import threading
 import time
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -149,7 +150,8 @@ class SetlistFmClient:
         self._min_interval = min_interval
         self._max_retries = max_retries
         self._sleep = sleep
-        self._last_request_at = 0.0
+        self._last_request_at = float("-inf")  # first request never waits
+        self._rate_lock = threading.Lock()
 
     # ---- public methods ---------------------------------------------------
 
@@ -233,8 +235,16 @@ class SetlistFmClient:
         raise SetlistFmError("setlist.fm is unavailable right now. Try again soon.")
 
     def _wait_for_turn(self) -> None:
-        """Space requests at least `min_interval` seconds apart (rate limiting)."""
-        elapsed = time.monotonic() - self._last_request_at
-        if elapsed < self._min_interval:
-            self._sleep(self._min_interval - elapsed)
-        self._last_request_at = time.monotonic()
+        """Space requests at least `min_interval` seconds apart (rate limiting).
+
+        The web server handles requests on several threads. Each thread
+        reserves the next free time slot while holding the lock, then sleeps
+        until its slot outside the lock, so two threads can never claim the
+        same slot and burst past setlist.fm's limit.
+        """
+        with self._rate_lock:
+            now = time.monotonic()
+            slot = max(now, self._last_request_at + self._min_interval)
+            self._last_request_at = slot
+        if slot > now:
+            self._sleep(slot - now)

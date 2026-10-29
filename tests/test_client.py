@@ -129,3 +129,30 @@ def test_recent_shows_follows_pages():
 def test_requires_api_key():
     with pytest.raises(SetlistFmError):
         SetlistFmClient("")
+
+
+def test_rate_limiter_gives_concurrent_requests_separate_slots():
+    # Five server threads ask for a turn at the same instant. Each must get
+    # its own slot, min_interval apart, instead of all going at once.
+    import threading
+
+    sleeps = []
+    client = SetlistFmClient(
+        "test-key", http=FakeHttp([]), sleep=sleeps.append, min_interval=10
+    )
+    start = threading.Barrier(5)
+
+    def take_turn():
+        start.wait()
+        client._wait_for_turn()
+
+    threads = [threading.Thread(target=take_turn) for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # One thread goes immediately; the others wait about 10, 20, 30 and 40s.
+    assert len(sleeps) == 4
+    for expected, actual in zip([10, 20, 30, 40], sorted(sleeps)):
+        assert actual == pytest.approx(expected, abs=1)
