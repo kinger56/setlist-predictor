@@ -1,0 +1,23 @@
+# Render "Blueprint": tells Render how to build and run this app.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: setlist-predictor
+    runtime: python          # Python version comes from .python-version (3.12)
+    plan: free               # sleeps after 15 min idle; first visit then takes ~1 min
+    region: oregon           # closest region to California
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    # One process, so the whole app shares one rate limiter and one cache.
+    # Render picks the port and passes it in $PORT.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    # Only deploy commits whose GitHub Actions tests passed.
+    autoDeployTrigger: checksPass
+    envVars:
+      # Secret: Render asks for it once in the dashboard. It is never in git.
+      - key: SETLISTFM_API_KEY
+        sync: false
+      # The filesystem is wiped on every restart, which is fine for a cache.
+      - key: CACHE_DB
+        value: cache.db
