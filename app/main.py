@@ -45,7 +45,8 @@ app = FastAPI(title="Setlist Predictor")
 # Each visitor gets this many API requests per window. A predict or backtest
 # can call setlist.fm several times, and the key's daily quota is shared by
 # everyone, so one visitor (or bot) shouldn't be able to use it all up.
-API_REQUESTS_PER_WINDOW = 40
+# (Generous, because campus Wi-Fi puts many people behind one public IP.)
+API_REQUESTS_PER_WINDOW = 120
 API_WINDOW_SECONDS = 5 * 60
 app.state.api_throttle = Throttle(API_REQUESTS_PER_WINDOW, API_WINDOW_SECONDS)
 
