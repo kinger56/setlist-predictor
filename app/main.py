@@ -16,7 +16,10 @@ Run locally:  uvicorn app.main:app --reload
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -26,8 +29,10 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.backtest import backtest
 from app.cache import Cache
+from app.client_ip import client_ip
 from app.predictor import ROTATING, LIKELY, SongStats, predict
 from app.setlistfm import SetlistFmClient, SetlistFmError
+from app.throttle import Throttle
 
 load_dotenv()  # reads .env into environment variables (local development only)
 
@@ -36,6 +41,64 @@ STATIC_DIR = Path(__file__).parent / "static"
 MBID_PATTERN = r"^[0-9a-fA-F-]{36}$"
 
 app = FastAPI(title="Setlist Predictor")
+
+# Each visitor gets this many API requests per window. A predict or backtest
+# can call setlist.fm several times, and the key's daily quota is shared by
+# everyone, so one visitor (or bot) shouldn't be able to use it all up.
+API_REQUESTS_PER_WINDOW = 40
+API_WINDOW_SECONDS = 5 * 60
+app.state.api_throttle = Throttle(API_REQUESTS_PER_WINDOW, API_WINDOW_SECONDS)
+
+
+def _inline_hashes(html: str, tag: str) -> list[str]:
+    """CSP hashes for the page's inline <script>/<style> blocks, so the
+    browser runs exactly those and refuses any other inline code."""
+    blocks = re.findall(rf"<{tag}>(.*?)</{tag}>", html, flags=re.DOTALL)
+    return [
+        "'sha256-" + base64.b64encode(hashlib.sha256(b.encode()).digest()).decode() + "'"
+        for b in blocks
+    ]
+
+
+_PAGE = (STATIC_DIR / "index.html").read_text()
+CSP = "; ".join([
+    "default-src 'self'",
+    "script-src " + " ".join(_inline_hashes(_PAGE, "script")),
+    "style-src " + " ".join(_inline_hashes(_PAGE, "style")),
+    "img-src 'self' data:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",  # can't be shown inside another site (clickjacking)
+])
+
+
+@app.middleware("http")
+async def protect(request: Request, call_next):
+    """Rate-limit the API per visitor, and add security headers."""
+    path = request.url.path
+    if path.startswith("/api/") and path != "/api/health":
+        ip = client_ip(request)
+        wait = request.app.state.api_throttle.retry_after(ip)
+        if wait:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": f"Too many requests. Try again in {wait} seconds."},
+                headers={"Retry-After": str(wait)},
+            )
+        request.app.state.api_throttle.record(ip)
+
+    response = await call_next(request)
+    headers = response.headers
+    headers.setdefault("X-Content-Type-Options", "nosniff")
+    headers.setdefault("X-Frame-Options", "DENY")
+    headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if not path.startswith(("/docs", "/redoc")):  # Swagger loads code from a CDN
+        headers.setdefault("Content-Security-Policy", CSP)
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 
 # --------------------------------------------------------------------------

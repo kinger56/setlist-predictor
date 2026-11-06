@@ -4,7 +4,8 @@ using FastAPI's dependency_overrides, so these run instantly and offline."""
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app, get_client
+from app.main import API_REQUESTS_PER_WINDOW, API_WINDOW_SECONDS, app, get_client
+from app.throttle import Throttle
 from app.setlistfm import Artist, SetlistFmError
 from tests.helpers import make_show
 
@@ -31,6 +32,8 @@ def api():
 
     def build(fake):
         app.dependency_overrides[get_client] = lambda: fake
+        # Fresh rate-limit counters, so tests can't use up each other's quota.
+        app.state.api_throttle = Throttle(API_REQUESTS_PER_WINDOW, API_WINDOW_SECONDS)
         return TestClient(app)
 
     yield build
