@@ -10,7 +10,10 @@ services:
     buildCommand: pip install -r requirements.txt
     # One process, so the whole app shares one rate limiter and one cache.
     # Render picks the port and passes it in $PORT.
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # --no-proxy-headers: uvicorn otherwise rewrites the connection address
+    # from the (fakeable) leftmost X-Forwarded-For entry by default; the real
+    # visitor IP is worked out in app/client_ip.py instead.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-proxy-headers
     healthCheckPath: /api/health
     # Only deploy commits whose GitHub Actions tests passed.
     autoDeployTrigger: checksPass

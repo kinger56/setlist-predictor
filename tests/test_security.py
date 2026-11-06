@@ -65,3 +65,15 @@ def test_csp_allows_exactly_the_pages_own_inline_code():
 
 def test_fake_forwarded_ips_are_ignored():
     assert real_client_ip("45.33.32.1, 73.15.20.9", RENDER_PROXY) == "73.15.20.9"
+
+
+def test_render_turns_off_uvicorns_own_header_handling():
+    from pathlib import Path
+    start = (Path(__file__).parent.parent / "render.yaml").read_text()
+    assert "--no-proxy-headers" in start and " --proxy-headers" not in start
+
+
+def test_header_chain_seen_on_render():
+    # Captured from Render (2026-11-06): visitor, Cloudflare edge, Render internal.
+    chain = "45.33.32.250,129.210.115.225, 104.23.160.121, 10.31.99.80"
+    assert real_client_ip(chain, "127.0.0.1") == "129.210.115.225"
